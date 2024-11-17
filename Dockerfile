@@ -88,7 +88,10 @@ VOLUME /home/usr1cv8/.1cv8 /var/log/1C /var/1C/licenses/
 # Установка точки входа и выполнение дополнительных настроек
 RUN apt-get update && apt-get install -yq procps
 
+COPY scripts/healthcheck.sh /healthcheck.sh
 COPY scripts/entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN chmod +x /entrypoint.sh \
+&& chmod +x /healthcheck.sh
+
 ENTRYPOINT ["/entrypoint.sh"]
 CMD ["ragent"]

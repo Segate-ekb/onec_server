@@ -318,9 +318,28 @@ main() {
     echo "Запускаем ragent с необходимыми параметрами"
     echo "Выполняемая команда: $RAGENT_CMD"
     exec $RAGENT_CMD 2>&1
+  elif [ "$1" = "dry-run" ]; then
+    setup_ragent_cmd
+    setup_ras_cmd
+
+    echo "Запускаем ras и ragent в режиме dry-run"
+    $RAS_CMD 2>&1 &  # Запуск ras в фоновом режиме
+    $RAGENT_CMD 2>&1 &  # Запуск ragent в фоновом режиме
+
+    # Ждем несколько секунд для запуска сервисов
+    sleep 10
+
+    # Выполняем проверку доступности кластера
+    if /healthcheck.sh; then
+      echo "Кластер успешно запущен в режиме dry-run"
+      exit 0
+    else
+      echo "Ошибка запуска кластера в режиме dry-run" >&2
+      exit 1
+    fi
   else
-    # Если первый аргумент не 'ragent', выполняем команду, переданную в аргументах
-    "$@"
+    # Если первый аргумент не 'ragent' или 'dry-run', выполняем команду, переданную в аргументах
+    exec "$@"
   fi
 }
 
