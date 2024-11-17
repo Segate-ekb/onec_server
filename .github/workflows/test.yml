@@ -45,7 +45,3 @@ jobs:
           -e ONEC_PASSWORD \
           -e ONEC_VERSION=${{ matrix.onec_version }} \
           onec-server:${{ matrix.onec_version }} dry-run
-
-    - name: Show container logs for version ${{ matrix.onec_version }}
-      if: failure()
-      run: docker logs onec-server-test-${{ matrix.onec_version }}
