@@ -262,32 +262,32 @@ setup_defaults() {
 
 # Настройка команды запуска ragent
 setup_ragent_cmd() {
-  RAGENT_CMD="gosu usr1cv8 /opt/1cv8/current/ragent"
-  RAGENT_CMD+=" /port ${PORT:-$DEFAULT_PORT}"
-  RAGENT_CMD+=" /regport ${REGPORT:-$DEFAULT_REGPORT}"
-  RAGENT_CMD+=" /range ${RANGE:-$DEFAULT_RANGE}"
-  RAGENT_CMD+=" /seclev ${SECLEVEL:-$DEFAULT_SECLEVEL}"
-  RAGENT_CMD+=" /d ${D:-/home/usr1cv8/.1cv8}"
-  RAGENT_CMD+=" /pingPeriod ${PINGPERIOD:-$DEFAULT_PINGPERIOD}"
-  RAGENT_CMD+=" /pingTimeout ${PINGTIMEOUT:-$DEFAULT_PINGTIMEOUT}"
-  RAGENT_CMD+=" /debug ${DEBUG:-$DEFAULT_DEBUG}"
+  RAGENT_CMD=(gosu usr1cv8 /opt/1cv8/current/ragent)
+  RAGENT_CMD+=("/port" "${PORT:-$DEFAULT_PORT}")
+  RAGENT_CMD+=("/regport" "${REGPORT:-$DEFAULT_REGPORT}")
+  RAGENT_CMD+=("/range" "${RANGE:-$DEFAULT_RANGE}")
+  RAGENT_CMD+=("/seclev" "${SECLEVEL:-$DEFAULT_SECLEVEL}")
+  RAGENT_CMD+=("/d" "${D:-/home/usr1cv8/.1cv8}")
+  RAGENT_CMD+=("/pingPeriod" "${PINGPERIOD:-$DEFAULT_PINGPERIOD}")
+  RAGENT_CMD+=("/pingTimeout" "${PINGTIMEOUT:-$DEFAULT_PINGTIMEOUT}")
+  RAGENT_CMD+=("/debug" "${DEBUG:-$DEFAULT_DEBUG}")
 
   if [ -n "$DEBUGSERVERADDR" ]; then
-    RAGENT_CMD+=" /debugServerAddr $DEBUGSERVERADDR"
+    RAGENT_CMD+=("/debugServerAddr" "$DEBUGSERVERADDR")
   fi
 
-  RAGENT_CMD+=" /debugServerPort ${DEBUGSERVERPORT:-$DEFAULT_DEBUGSERVERPORT}"
+  RAGENT_CMD+=("/debugServerPort" "${DEBUGSERVERPORT:-$DEFAULT_DEBUGSERVERPORT}")
 
   if [ -n "$DEBUGSERVERPWD" ]; then
-    RAGENT_CMD+=" /debugServerPwd $DEBUGSERVERPWD"
+    RAGENT_CMD+=("/debugServerPwd" "$DEBUGSERVERPWD")
   fi
 }
 
 # Настройка команды запуска ras
 setup_ras_cmd() {
-  RAS_CMD="gosu usr1cv8 /opt/1cv8/current/ras cluster --daemon"
-  RAS_CMD+=" --port ${RAS_PORT:-$DEFAULT_RAS_PORT}"
-  RAS_CMD+=" localhost:${PORT:-$DEFAULT_PORT}"
+  RAS_CMD=(gosu usr1cv8 /opt/1cv8/current/ras cluster --daemon)
+  RAS_CMD+=("--port" "${RAS_PORT:-$DEFAULT_RAS_PORT}")
+  RAS_CMD+=("localhost:${PORT:-$DEFAULT_PORT}")
 }
 
 # Изменение прав доступа к директории пользователя
@@ -318,25 +318,34 @@ main() {
     echo "Запускаем ragent с необходимыми параметрами"
     echo "Выполняемая команда: $RAGENT_CMD"
     exec $RAGENT_CMD 2>&1
-  elif [ "$1" = "dry-run" ]; then
-    setup_ragent_cmd
-    setup_ras_cmd
+elif [ "$1" = "dry-run" ]; then
+  setup_ragent_cmd
+  setup_ras_cmd
 
-    echo "Запускаем ras и ragent в режиме dry-run"
-    $RAS_CMD 2>&1 &  # Запуск ras в фоновом режиме
-    $RAGENT_CMD 2>&1 &  # Запуск ragent в фоновом режиме
+  echo "Запускаем ras и ragent в режиме dry-run"
+  "${RAS_CMD[@]}" 2>&1 &  # Запуск ras в фоновом режиме
+  "${RAGENT_CMD[@]}" 2>&1 &  # Запуск ragent в фоновом режиме
 
-    # Ждем несколько секунд для запуска сервисов
-    sleep 10
-
-    # Выполняем проверку доступности кластера
+  # Ждем, пока кластер станет доступным
+  max_attempts=12
+  attempt=1
+  while [ $attempt -le $max_attempts ]; do
     if /healthcheck.sh; then
       echo "Кластер успешно запущен в режиме dry-run"
+      # Останавливаем процессы ras и ragent
+      kill $(jobs -p)
       exit 0
     else
-      echo "Ошибка запуска кластера в режиме dry-run" >&2
-      exit 1
+      echo "Кластер еще не запущен, попытка $attempt из $max_attempts. Ожидание 5 секунд..." >&2
+      sleep 5
+      attempt=$((attempt + 1))
     fi
+  done
+
+  echo "Ошибка запуска кластера в режиме dry-run" >&2
+  # Останавливаем процессы ras и ragent
+  kill $(jobs -p)
+  exit 1
   else
     # Если первый аргумент не 'ragent' или 'dry-run', выполняем команду, переданную в аргументах
     exec "$@"
