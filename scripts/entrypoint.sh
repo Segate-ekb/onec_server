@@ -50,11 +50,11 @@ find_platform_path() {
 
 # Функция для создания символической ссылки /opt/1cv8/current
 create_symlink() {
-    mkdir -p /opt/1cv8
     ln -sfnT "$platform_path" /opt/1cv8/current
-
+    cd /opt/1cv8/current
+    ls
     # ln -sfn "$platform_path" /opt/1cv8/current
-     echo "Создана символическая ссылка /opt/1cv8/current на $platform_path" >&2
+    echo "Создана символическая ссылка /opt/1cv8/current на $platform_path" >&2
 }
 
 # Функция для скачивания сервера 1С
@@ -71,10 +71,6 @@ download_1c_server() {
 
     echo "Проверяем наличие установленной платформы 1С версии $ONEC_VERSION..." >&2
 
-    if find_platform_path; then
-        # Платформа найдена, создаем символическую ссылку
-        create_symlink
-    else
         # Платформа не найдена, необходимо скачать и установить
         echo "Сервер 1С не найден. Начинаю скачивание и установку." >&2
 
@@ -197,7 +193,6 @@ download_1c_server() {
         echo "Дистрибутив сервера 1С готов к установке." >&2
         # После успешного скачивания устанавливаем сервер
         install_1c_server
-    fi
 }
 
 # Функция для установки сервера 1С
@@ -239,21 +234,9 @@ install_1c_server() {
 
     echo "Сервер 1С успешно установлен." >&2
 
-    # Ищем путь к установленной платформе
-    if find_platform_path; then
-        # Создаем символическую ссылку
-        create_symlink
-    else
-        echo "Ошибка: Не удалось найти установленную платформу после установки." >&2
-        exit 1
-    fi
-
     # Добавляем очистку установочных файлов
     echo "Очищаем установочные файлы." >&2
     rm -rf "$DOWNLOADS_PATH"
-
-    # Возвращаемся в домашнюю директорию или любую другую существующую директорию
-    cd /home/usr1cv8
 }
 
 # Установка значений по умолчанию
@@ -271,32 +254,32 @@ setup_defaults() {
 
 # Настройка команды запуска ragent
 setup_ragent_cmd() {
-    RAGENT_CMD="gosu usr1cv8 /opt/1cv8/current/ragent"
-    RAGENT_CMD+=" /port ${PORT:-$DEFAULT_PORT}"
-    RAGENT_CMD+=" /regport ${REGPORT:-$DEFAULT_REGPORT}"
-    RAGENT_CMD+=" /range ${RANGE:-$DEFAULT_RANGE}"
-    RAGENT_CMD+=" /seclev ${SECLEVEL:-$DEFAULT_SECLEVEL}"
-    RAGENT_CMD+=" /d ${D:-/home/usr1cv8/.1cv8}"
-    RAGENT_CMD+=" /pingPeriod ${PINGPERIOD:-$DEFAULT_PINGPERIOD}"
-    RAGENT_CMD+=" /pingTimeout ${PINGTIMEOUT:-$DEFAULT_PINGTIMEOUT}"
-    RAGENT_CMD+=" /debug ${DEBUG:-$DEFAULT_DEBUG}"
+    RAGENT_CMD=(gosu usr1cv8 /opt/1cv8/current/ragent)
+    RAGENT_CMD+=(/port "${PORT:-$DEFAULT_PORT}")
+    RAGENT_CMD+=(/regport "${REGPORT:-$DEFAULT_REGPORT}")
+    RAGENT_CMD+=(/range "${RANGE:-$DEFAULT_RANGE}")
+    RAGENT_CMD+=(/seclev "${SECLEVEL:-$DEFAULT_SECLEVEL}")
+    RAGENT_CMD+=(/d "${D:-/home/usr1cv8/.1cv8}")
+    RAGENT_CMD+=(/pingPeriod "${PINGPERIOD:-$DEFAULT_PINGPERIOD}")
+    RAGENT_CMD+=(/pingTimeout "${PINGTIMEOUT:-$DEFAULT_PINGTIMEOUT}")
+    RAGENT_CMD+=(/debug "${DEBUG:-$DEFAULT_DEBUG}")
 
     if [ -n "$DEBUGSERVERADDR" ]; then
-        RAGENT_CMD+=" /debugServerAddr $DEBUGSERVERADDR"
+        RAGENT_CMD+=(/debugServerAddr "$DEBUGSERVERADDR")
     fi
 
-    RAGENT_CMD+=" /debugServerPort ${DEBUGSERVERPORT:-$DEFAULT_DEBUGSERVERPORT}"
+    RAGENT_CMD+=(/debugServerPort "${DEBUGSERVERPORT:-$DEFAULT_DEBUGSERVERPORT}")
 
     if [ -n "$DEBUGSERVERPWD" ]; then
-        RAGENT_CMD+=" /debugServerPwd $DEBUGSERVERPWD"
+        RAGENT_CMD+=(/debugServerPwd "$DEBUGSERVERPWD")
     fi
 }
 
 # Настройка команды запуска ras
 setup_ras_cmd() {
-    RAS_CMD="gosu usr1cv8 /opt/1cv8/current/ras cluster --daemon"
-    RAS_CMD+=" --port ${RAS_PORT:-$DEFAULT_RAS_PORT}"
-    RAS_CMD+=" localhost:${PORT:-$DEFAULT_PORT}"
+    RAS_CMD=(gosu usr1cv8 /opt/1cv8/current/ras cluster --daemon)
+    RAS_CMD+=(--port "${RAS_PORT:-$DEFAULT_RAS_PORT}")
+    RAS_CMD+=(localhost:"${PORT:-$DEFAULT_PORT}")
 }
 
 # Изменение прав доступа к директории пользователя
@@ -312,30 +295,41 @@ main() {
     ONEC_VERSION=$(read_env_or_file "ONEC_VERSION")
     check_env_var "ONEC_VERSION" "$ONEC_VERSION"
 
-    # Проверяем и устанавливаем сервер 1С, если он не установлен
-    download_1c_server
-    
+    set +e
+    find_platform_path
+    finded=$?
+    set -e
+
+    # Ищем путь к установленной платформе
+    if [ $finded -eq 1 ]; then
+        # устанавливаем сервер 1С, если он не установлен
+        download_1c_server
+    fi
+
+    create_symlink
+
     change_directory_permissions
 
     setup_defaults
+
     if [ "$1" = "ragent" ]; then
         setup_ragent_cmd
         setup_ras_cmd
 
         echo "Запускаем ras с необходимыми параметрами"
-        echo "Выполняемая команда: $RAS_CMD"
-        $RAS_CMD 2>&1 & # Запуск ras в фоновом режиме
+        echo "Выполняемая команда: ${RAS_CMD[@]}"
+        "${RAS_CMD[@]}" 2>&1 & # Запуск ras в фоновом режиме
 
         echo "Запускаем ragent с необходимыми параметрами"
-        echo "Выполняемая команда: $RAGENT_CMD"
-        exec $RAGENT_CMD 2>&1
+        echo "Выполняемая команда: ${RAGENT_CMD[@]}"
+        exec "${RAGENT_CMD[@]}" 2>&1
     elif [ "$1" = "dry-run" ]; then
         setup_ragent_cmd
         setup_ras_cmd
 
         echo "Запускаем ras и ragent в режиме dry-run"
-        $RAS_CMD 2>&1 &    # Запуск ras в фоновом режиме
-        $RAGENT_CMD 2>&1 & # Запуск ragent в фоновом режиме
+        "${RAS_CMD[@]}" 2>&1 &    # Запуск ras в фоновом режиме
+        "${RAGENT_CMD[@]}" 2>&1 & # Запуск ragent в фоновом режиме
 
         # Ждем, пока кластер станет доступным
         max_attempts=12
@@ -354,8 +348,6 @@ main() {
         done
 
         echo "Ошибка запуска кластера в режиме dry-run" >&2
-        # Останавливаем процессы ras и ragent
-        kill $(jobs -p)
         exit 1
     else
         # Если первый аргумент не 'ragent' или 'dry-run', выполняем команду, переданную в аргументах
