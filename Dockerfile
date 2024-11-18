@@ -89,7 +89,7 @@ ARG onec_gid="999"
 
 RUN groupadd -r grp1cv8 --gid=$onec_gid \
   && useradd -r -g grp1cv8 --uid=$onec_uid --home-dir=/home/usr1cv8 --shell=/bin/bash usr1cv8 \
-  && mkdir -p /var/log/1C /home/usr1cv8/.1cv8/1C/1cv8/conf /opt/1cv8/current/conf \
+  && mkdir -p /var/log/1C /home/usr1cv8/.1cv8/1C/1cv8/conf \
   && chown -R usr1cv8:grp1cv8 /var/log/1C /home/usr1cv8 \
   && mkdir -p /opt/1cv8 \
   && mkdir -p /var/1C/licenses

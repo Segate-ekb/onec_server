@@ -51,8 +51,10 @@ find_platform_path() {
 # Функция для создания символической ссылки /opt/1cv8/current
 create_symlink() {
     mkdir -p /opt/1cv8
-    ln -s "$platform_path" /opt/1cv8/current
-    echo "Создана символическая ссылка /opt/1cv8/current на $platform_path" >&2
+    ln -sfnT "$platform_path" /opt/1cv8/current
+
+    # ln -sfn "$platform_path" /opt/1cv8/current
+     echo "Создана символическая ссылка /opt/1cv8/current на $platform_path" >&2
 }
 
 # Функция для скачивания сервера 1С
@@ -249,6 +251,9 @@ install_1c_server() {
     # Добавляем очистку установочных файлов
     echo "Очищаем установочные файлы." >&2
     rm -rf "$DOWNLOADS_PATH"
+
+    # Возвращаемся в домашнюю директорию или любую другую существующую директорию
+    cd /home/usr1cv8
 }
 
 # Установка значений по умолчанию
