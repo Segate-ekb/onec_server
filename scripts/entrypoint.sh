@@ -52,8 +52,6 @@ find_platform_path() {
 create_symlink() {
     ln -sfnT "$platform_path" /opt/1cv8/current
     cd /opt/1cv8/current
-    ls
-    # ln -sfn "$platform_path" /opt/1cv8/current
     echo "Создана символическая ссылка /opt/1cv8/current на $platform_path" >&2
 }
 
@@ -332,6 +330,7 @@ main() {
         "${RAGENT_CMD[@]}" 2>&1 & # Запуск ragent в фоновом режиме
 
         # Ждем, пока кластер станет доступным
+        sleep 5
         max_attempts=12
         attempt=1
         while [ $attempt -le $max_attempts ]; do
